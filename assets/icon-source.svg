@@ -1,0 +1,82 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+  <defs>
+    <!-- 背景渐变: 深蓝 → 紫 -->
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#1e3a8a"/>
+      <stop offset="50%" stop-color="#3730a3"/>
+      <stop offset="100%" stop-color="#6d28d9"/>
+    </linearGradient>
+    <!-- 中央枢纽渐变 -->
+    <radialGradient id="hub" cx="50%" cy="40%" r="60%">
+      <stop offset="0%" stop-color="#ffffff"/>
+      <stop offset="100%" stop-color="#c7d2fe"/>
+    </radialGradient>
+    <!-- 柔和光晕 -->
+    <filter id="glow" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="14"/>
+    </filter>
+  </defs>
+
+  <!-- 圆角方块背景 -->
+  <rect width="1024" height="1024" rx="224" ry="224" fill="url(#bg)"/>
+
+  <!-- 背景装饰光晕 -->
+  <circle cx="512" cy="512" r="200" fill="#6366f1" opacity="0.25" filter="url(#glow)"/>
+
+  <!-- 连接线: 从 6 个外节点连向中央枢纽 -->
+  <g stroke="#a5b4fc" stroke-width="8" stroke-linecap="round" opacity="0.7">
+    <!-- 上 -->
+    <line x1="512" y1="512" x2="512" y2="270"/>
+    <!-- 右上 -->
+    <line x1="512" y1="512" x2="722" y2="302"/>
+    <!-- 右下 -->
+    <line x1="512" y1="512" x2="722" y2="722"/>
+    <!-- 下 -->
+    <line x1="512" y1="512" x2="512" y2="754"/>
+    <!-- 左下 -->
+    <line x1="512" y1="512" x2="302" y2="722"/>
+    <!-- 左上 -->
+    <line x1="512" y1="512" x2="302" y2="302"/>
+  </g>
+
+  <!-- 6 个外围 Agent 节点(不同颜色代表不同 Agent) -->
+  <!-- 上 - 蓝色 -->
+  <circle cx="512" cy="252" r="48" fill="#60a5fa"/>
+  <!-- 右上 - 绿色 -->
+  <circle cx="738" cy="286" r="48" fill="#34d399"/>
+  <!-- 右下 - 橙色 -->
+  <circle cx="738" cy="738" r="48" fill="#fbbf24"/>
+  <!-- 下 - 粉色 -->
+  <circle cx="512" cy="772" r="48" fill="#f472b6"/>
+  <!-- 左下 - 青色 -->
+  <circle cx="286" cy="738" r="48" fill="#22d3ee"/>
+  <!-- 左上 - 紫色 -->
+  <circle cx="286" cy="286" r="48" fill="#c084fc"/>
+
+  <!-- 节点高光 -->
+  <g fill="#ffffff" opacity="0.5">
+    <circle cx="500" cy="240" r="14"/>
+    <circle cx="726" cy="274" r="14"/>
+    <circle cx="726" cy="726" r="14"/>
+    <circle cx="500" cy="760" r="14"/>
+    <circle cx="274" cy="726" r="14"/>
+    <circle cx="274" cy="274" r="14"/>
+  </g>
+
+  <!-- 中央记忆枢纽(大脑/数据库结合轮廓) -->
+  <g>
+    <!-- 外圈光晕 -->
+    <circle cx="512" cy="512" r="120" fill="#a5b4fc" opacity="0.4" filter="url(#glow)"/>
+    <!-- 主体圆 -->
+    <circle cx="512" cy="512" r="104" fill="url(#hub)"/>
+    <!-- 中央 H 形(Hub) -->
+    <g stroke="#4338ca" stroke-width="28" stroke-linecap="round" fill="none">
+      <!-- 左竖 -->
+      <line x1="478" y1="476" x2="478" y2="548"/>
+      <!-- 右竖 -->
+      <line x1="546" y1="476" x2="546" y2="548"/>
+      <!-- 横连接 -->
+      <line x1="478" y1="512" x2="546" y2="512"/>
+    </g>
+  </g>
+</svg>
