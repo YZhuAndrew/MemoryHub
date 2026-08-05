@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 import { getVersion } from "@tauri-apps/api/app";
 import { useSettingsStore } from "../store/settings-store";
+import { checkForUpdate } from "../core/update-checker";
 import { BUILTIN_PROFILES } from "../core/profiles/builtin-profiles";
 import { resolveIcon, resolveColorText } from "../constants/icon-registry";
 import { MEMORY_TYPES } from "../constants/memory-types";
@@ -82,7 +83,6 @@ export function SettingsModal({
     setUpdateStatus("checking");
     setUpdateResult(null);
     try {
-      const { checkForUpdate } = await import("../core/update-checker");
       const current = await getVersion();
       const result = await checkForUpdate(current);
       setUpdateResult({
