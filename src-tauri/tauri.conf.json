@@ -1,6 +1,6 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "memoryhub",
+  "productName": "MemoryHub",
   "version": "0.1.0",
   "identifier": "com.yzhu.memoryhub",
   "build": {
@@ -27,6 +27,11 @@
   "bundle": {
     "active": true,
     "targets": "all",
+    "publisher": "YZhu",
+    "copyright": "© 2026 YZhu. MIT License.",
+    "category": "Productivity",
+    "shortDescription": "在一个轻量桌面应用中浏览、搜索、编辑、同步所有 AI Agent 的记忆",
+    "longDescription": "MemoryHub 是一个轻量级 macOS 桌面工具，把 Hermes、Codex、Claude Code、Memmy、千问办公、QoderWork、Trae 等各种 AI Agent 散落在各处的记忆文件全部扫描进来，在一个统一的三栏界面里浏览、搜索、编辑和备份。支持自定义 Agent、项目级记忆、编辑写回原文件、暗色模式。",
     "icon": [
       "icons/32x32.png",
       "icons/128x128.png",
