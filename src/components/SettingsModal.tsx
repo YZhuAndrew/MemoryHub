@@ -2,17 +2,19 @@
  * 设置弹窗
  */
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   ChevronDown,
   ChevronRight,
   FolderPlus,
   Pencil,
   Plus,
+  RefreshCw,
   Settings,
   Trash2,
   X,
 } from "lucide-react";
+import { getVersion } from "@tauri-apps/api/app";
 import { useSettingsStore } from "../store/settings-store";
 import { BUILTIN_PROFILES } from "../core/profiles/builtin-profiles";
 import { resolveIcon, resolveColorText } from "../constants/icon-registry";
@@ -66,6 +68,33 @@ export function SettingsModal({
   const [newProjectPath, setNewProjectPath] = useState("");
   // 新建的 custom Agent 自动展开进入编辑态
   const [newlyCreatedAgentId, setNewlyCreatedAgentId] = useState<string | null>(null);
+
+  // 当前版本号 + 设置内独立的更新检查状态
+  const [appVersion, setAppVersion] = useState("");
+  const [updateStatus, setUpdateStatus] = useState<"idle" | "checking" | "done" | "error">("idle");
+  const [updateResult, setUpdateResult] = useState<{ hasUpdate: boolean; latestVersion: string; releaseUrl: string } | null>(null);
+
+  useEffect(() => {
+    getVersion().then(setAppVersion).catch(() => setAppVersion(""));
+  }, []);
+
+  const handleCheckUpdate = async () => {
+    setUpdateStatus("checking");
+    setUpdateResult(null);
+    try {
+      const { checkForUpdate } = await import("../core/update-checker");
+      const current = await getVersion();
+      const result = await checkForUpdate(current);
+      setUpdateResult({
+        hasUpdate: result.hasUpdate,
+        latestVersion: result.latestVersion,
+        releaseUrl: result.releaseUrl,
+      });
+      setUpdateStatus("done");
+    } catch {
+      setUpdateStatus("error");
+    }
+  };
 
   const handlePickFolder = async () => {
     const folder = await pickFolder();
@@ -276,6 +305,39 @@ export function SettingsModal({
 
         {/* 底部 */}
         <div className="border-t border-neutral-200 px-5 py-3 dark:border-neutral-700">
+          <div className="mb-2 flex items-center justify-between gap-2">
+            <span className="text-xs text-neutral-400">
+              {appVersion && `当前版本 v${appVersion}`}
+            </span>
+            <div className="flex items-center gap-2">
+              {/* 更新检查结果提示 */}
+              {updateStatus === "done" && updateResult && (
+                updateResult.hasUpdate ? (
+                  <a
+                    href={updateResult.releaseUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="text-xs font-medium text-blue-600 hover:underline dark:text-blue-400"
+                  >
+                    发现新版本 v{updateResult.latestVersion} → 下载
+                  </a>
+                ) : (
+                  <span className="text-xs text-green-600 dark:text-green-400">已是最新版本 ✓</span>
+                )
+              )}
+              {updateStatus === "error" && (
+                <span className="text-xs text-neutral-400">检查失败</span>
+              )}
+              <button
+                onClick={handleCheckUpdate}
+                disabled={updateStatus === "checking"}
+                className="flex items-center gap-1 rounded border border-neutral-300 px-2 py-1 text-xs text-neutral-600 transition-colors hover:bg-neutral-100 disabled:opacity-50 dark:border-neutral-600 dark:text-neutral-300 dark:hover:bg-neutral-800"
+              >
+                <RefreshCw className={`h-3 w-3 ${updateStatus === "checking" ? "animate-spin" : ""}`} />
+                检查更新
+              </button>
+            </div>
+          </div>
           <p className="text-xs text-neutral-400">
             设置保存在 ~/.memoryhub/settings.json · 修改后自动重新扫描
           </p>
