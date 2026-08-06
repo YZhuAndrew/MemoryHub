@@ -79,6 +79,10 @@ export interface AppSettings {
   customAgents: CustomAgent[];
   /** 单条记忆的类型覆盖 (itemId → type) */
   itemTypes?: Record<string, string>;
+  /** 关闭窗口时驻留菜单栏(默认 true)。关闭则点关闭按钮正常退出。 */
+  stayInTray?: boolean;
+  /** 记忆文件变化时自动重新扫描(默认 true)。 */
+  autoRefresh?: boolean;
 }
 
 /** 各 Agent 的默认图标和颜色 */
@@ -108,4 +112,6 @@ export const DEFAULT_SETTINGS: AppSettings = {
   agents: [],
   projects: [],
   customAgents: [],
+  stayInTray: true,
+  autoRefresh: true,
 };

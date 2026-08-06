@@ -63,6 +63,7 @@ export function SettingsModal({
     updateProject,
     pickFolder,
     addCustomAgent,
+    setBoolSetting,
   } = useSettingsStore();
 
   const [newProjectName, setNewProjectName] = useState("");
@@ -147,6 +148,27 @@ export function SettingsModal({
 
         {/* 内容 */}
         <div className="flex-1 overflow-y-auto px-5 py-4">
+          {/* 常规 */}
+          <section className="mb-6">
+            <h3 className="mb-2 text-sm font-semibold text-neutral-700 dark:text-neutral-300">
+              常规
+            </h3>
+            <div className="space-y-1.5">
+              <BoolSettingRow
+                title="关闭窗口时驻留菜单栏"
+                desc="点关闭按钮隐藏到菜单栏(进程保留),从 Dock 或托盘图标重新打开。关闭后点关闭按钮将真正退出应用。"
+                value={settings.stayInTray ?? true}
+                onChange={(v) => { setBoolSetting("stayInTray", v); onChanged(); }}
+              />
+              <BoolSettingRow
+                title="记忆变化时自动刷新"
+                desc="检测到 Agent 记忆文件变化时自动重新扫描。关闭后需手动点「重新扫描」。"
+                value={settings.autoRefresh ?? true}
+                onChange={(v) => { setBoolSetting("autoRefresh", v); onChanged(); }}
+              />
+            </div>
+          </section>
+
           {/* Agent 配置 */}
           <section className="mb-6">
             <h3 className="mb-2 text-sm font-semibold text-neutral-700 dark:text-neutral-300">
@@ -346,6 +368,38 @@ export function SettingsModal({
           </p>
         </div>
       </div>
+    </div>
+  );
+}
+
+/** 布尔设置开关行(标题 + 描述 + 启用/禁用 按钮) */
+function BoolSettingRow({
+  title,
+  desc,
+  value,
+  onChange,
+}: {
+  title: string;
+  desc: string;
+  value: boolean;
+  onChange: (v: boolean) => void;
+}) {
+  return (
+    <div className="flex items-center justify-between gap-3 rounded-md border border-neutral-200 px-3 py-2 dark:border-neutral-700">
+      <div className="min-w-0">
+        <div className="text-sm font-medium text-neutral-700 dark:text-neutral-300">{title}</div>
+        <div className="mt-0.5 text-xs leading-relaxed text-neutral-400">{desc}</div>
+      </div>
+      <button
+        onClick={() => onChange(!value)}
+        className={`shrink-0 rounded px-3 py-1 text-xs font-medium transition-colors ${
+          value
+            ? "bg-green-100 text-green-700 hover:bg-green-200 dark:bg-green-900/40 dark:text-green-300"
+            : "bg-neutral-200 text-neutral-500 dark:bg-neutral-700 dark:text-neutral-400"
+        }`}
+      >
+        {value ? "已开启" : "已关闭"}
+      </button>
     </div>
   );
 }

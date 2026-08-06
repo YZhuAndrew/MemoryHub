@@ -3,6 +3,7 @@
  */
 
 import { useEffect, useRef, useState } from "react";
+import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import { Archive as ArchiveIcon, Download, Moon, RefreshCw, Settings, Sun, X } from "lucide-react";
 import { Sidebar } from "./components/Sidebar";
 import { MemoryList } from "./components/MemoryList";
@@ -44,6 +45,30 @@ function App() {
       void updateCheck.checkOnceOnStartup();
     })();
   }, [runScan, loadSettings, updateCheck]);
+
+  // 监听托盘事件:重新扫描 / 记忆文件变化(防抖 + 受 autoRefresh 控制)
+  useEffect(() => {
+    let rescanUnlisten: UnlistenFn | undefined;
+    let changedUnlisten: UnlistenFn | undefined;
+    let debounceTimer: ReturnType<typeof setTimeout> | undefined;
+
+    // 托盘菜单「重新扫描」—— 始终响应
+    listen("tray-rescan", () => { void runScan(); }).then((un) => { rescanUnlisten = un; });
+
+    // 记忆文件变化 —— 防抖 1.5s,且仅在开启自动刷新时响应
+    listen("mem-changed", () => {
+      if (!useSettingsStore.getState().settings.autoRefresh) return;
+      if (debounceTimer) clearTimeout(debounceTimer);
+      debounceTimer = setTimeout(() => { void runScan(); }, 1500);
+    }).then((un) => { changedUnlisten = un; });
+
+    return () => {
+      rescanUnlisten?.();
+      changedUnlisten?.();
+      if (debounceTimer) clearTimeout(debounceTimer);
+    };
+  }, [runScan]);
+  // 注: autoRefresh 通过 useSettingsStore.getState() 实时读取,故不放进依赖(避免重复订阅)
 
   return (
     <div className="flex h-screen flex-col bg-white dark:bg-neutral-950">

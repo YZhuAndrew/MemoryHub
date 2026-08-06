@@ -47,6 +47,9 @@ interface SettingsState {
   removeCustomAgent: (id: string) => void;
   toggleCustomAgentEnabled: (id: string) => void;
 
+  // 通用设置 (布尔开关: stayInTray / autoRefresh)
+  setBoolSetting: (key: "stayInTray" | "autoRefresh", value: boolean) => void;
+
   // 文件夹选择
   pickFolder: () => Promise<string | null>;
 }
@@ -72,6 +75,10 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
         customAgents: Array.isArray(saved.customAgents)
           ? (saved.customAgents as CustomAgent[])
           : [],
+        stayInTray:
+          typeof saved.stayInTray === "boolean" ? saved.stayInTray : true,
+        autoRefresh:
+          typeof saved.autoRefresh === "boolean" ? saved.autoRefresh : true,
       };
       set({ settings, loaded: true });
     } catch {
@@ -280,6 +287,11 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
         ),
       },
     }));
+    get().saveSettings();
+  },
+
+  setBoolSetting: (key, value) => {
+    set((state) => ({ settings: { ...state.settings, [key]: value } }));
     get().saveSettings();
   },
 

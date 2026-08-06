@@ -628,6 +628,169 @@ fn matches_glob(filename: &str, glob_base: &str) -> bool {
 // Tauri 应用入口
 // ============================================================================
 
+use tauri::{Emitter, Manager, WindowEvent};
+use tauri::menu::{Menu, MenuItem, PredefinedMenuItem};
+use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
+use notify::{Watcher, RecursiveMode, RecommendedWatcher, EventKind};
+
+/// 内置 Agent 的根目录 (相对 HOME),文件监听覆盖这些目录。
+/// 自定义 Agent / 项目目录暂不纳入 watcher,用户可手动重新扫描。
+const WATCH_AGENT_DIRS: &[&str] = &[
+    ".hermes",
+    ".codex",
+    ".claude",
+    ".claude-mem",
+    ".workbuddy",
+    ".openclaw",
+    ".copaw",
+    ".memmy",
+    ".qwenworkcn",
+    ".qoderworkcn",
+    ".trae-cn",
+    ".zcode",
+];
+
+/// 读取「关闭驻留」开关 (默认 true)。失败/缺失时默认 true,保证常驻体验不退化。
+fn read_stay_in_tray() -> bool {
+    let home = match std::env::var("HOME") {
+        Ok(h) => h,
+        Err(_) => return true,
+    };
+    let settings_path = format!("{}/.memoryhub/settings.json", home);
+    let content = match std::fs::read_to_string(&settings_path) {
+        Ok(c) => c,
+        Err(_) => return true,
+    };
+    let value: Value = match serde_json::from_str(&content) {
+        Ok(v) => v,
+        Err(_) => return true,
+    };
+    value.get("stayInTray").and_then(|v| v.as_bool()).unwrap_or(true)
+}
+
+/// 切换主窗口显隐 (托盘菜单 + 托盘图标点击共用)
+fn toggle_main_window(app: &tauri::AppHandle) {
+    if let Some(window) = app.get_webview_window("main") {
+        if window.is_visible().unwrap_or(false) {
+            let _ = window.hide();
+        } else {
+            let _ = window.show();
+            let _ = window.set_focus();
+        }
+    }
+}
+
+/// 启动文件监听,检测到记忆文件变化时 emit "mem-changed" 给前端。
+/// 监听始终运行(开销极小),是否响应由前端按 autoRefresh 设置决定。
+fn start_memory_watcher(app: tauri::AppHandle) -> Option<RecommendedWatcher> {
+    let home = std::env::var("HOME").ok()?;
+
+    // 记忆文件的路径片段白名单(取自 builtin profiles 的真实记忆路径)。
+    // 只有命中其一才视为「记忆变化」,避免 Agent 目录里的配置/日志/状态文件触发刷新。
+    // 注:用片段匹配,这样 memories/USER.md、workspaces/x/MEMORY.md、awareness/main/MEMORY.md 都能命中。
+    const MEM_PATH_FRAGMENTS: &[&str] = &[
+        "memories/",
+        "MEMORY.md",
+        "memory_summary.md",
+        "raw_memories.md",
+        "user_profile.md",
+        "/memory/",
+        "memory-service/",
+        "CLAUDE.md",
+        "AGENTS.md",
+        "SOUL.md",
+        "USER.md",
+        "IDENTITY.md",
+        "BOOTSTRAP.md",
+        "TOOLS.md",
+        "HEARTBEAT.md",
+        "PROFILE.md",
+        "claude-mem.db",
+        "memory.sqlite",
+        "awareness/",
+        "user_rules/",
+        // 以下目录类记忆(用前缀式片段,命中目录内任意文件)
+        "agents/",
+        "projects/",
+        "skills/",
+        "plans/",
+        "rules/",
+        "prompts/",
+    ];
+
+    // 明确排除的噪音文件名(Agent 运行时配置/日志,虽然后缀命中但与记忆无关)。
+    const NOISE_FILENAMES: &[&str] = &[
+        "config.json",
+        "setting.json",
+        "settings.json",
+        "channel_directory.json",
+        "state.json",
+    ];
+
+    let mut watcher = match RecommendedWatcher::new(
+        move |res: notify::Result<notify::Event>| {
+            if let Ok(event) = res {
+                // 仅关心文件内容/创建/删除变化,忽略单纯访问
+                let relevant = matches!(
+                    event.kind,
+                    EventKind::Create(_) | EventKind::Modify(_) | EventKind::Remove(_)
+                );
+                if !relevant {
+                    return;
+                }
+                // 路径片段白名单:至少一个变化文件命中记忆路径特征,才触发刷新
+                let has_mem_file = event.paths.iter().any(|p| {
+                    let s = p.to_string_lossy();
+                    // 先排除已知噪音文件(按文件名精确匹配)
+                    let fname = p
+                        .file_name()
+                        .and_then(|f| f.to_str())
+                        .unwrap_or("");
+                    if NOISE_FILENAMES.iter().any(|n| *n == fname) {
+                        return false;
+                    }
+                    // 排除运行时文件:日志、轮询租约、锁文件、临时文件、心跳状态
+                    // (这些虽落在 memory/ 等目录下,但不是记忆内容,反复写入会触发刷新循环)
+                    if s.contains("/logs")
+                        || s.contains("logs_")
+                        || s.contains("polling-lease")
+                        || s.contains("polling_lease")
+                        || fname.starts_with(".")
+                        || fname.ends_with(".lock")
+                        || fname.ends_with(".tmp")
+                        || fname.ends_with(".swp")
+                    {
+                        return false;
+                    }
+                    MEM_PATH_FRAGMENTS.iter().any(|frag| s.contains(frag))
+                });
+                if !has_mem_file {
+                    return;
+                }
+                let _ = app.emit("mem-changed", ());
+            }
+        },
+        notify::Config::default(),
+    ) {
+        Ok(w) => w,
+        Err(e) => {
+            eprintln!("启动文件监听失败: {}", e);
+            return None;
+        }
+    };
+
+    for dir in WATCH_AGENT_DIRS {
+        let full = format!("{}/{}", home, dir);
+        if Path::new(&full).is_dir() {
+            if let Err(e) = watcher.watch(Path::new(&full), RecursiveMode::Recursive) {
+                eprintln!("监听 {} 失败: {}", full, e);
+            }
+        }
+    }
+
+    Some(watcher)
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -650,6 +813,78 @@ pub fn run() {
             restore_backup,
             delete_backup,
         ])
-        .run(tauri::generate_context!())
-        .expect("error while running tauri application");
+        .setup(|app| {
+            // ---- 菜单栏托盘 ----
+            let toggle_i = MenuItem::with_id(app, "toggle", "显示/隐藏主窗口", true, None::<&str>)?;
+            let rescan_i = MenuItem::with_id(app, "rescan", "重新扫描", true, None::<&str>)?;
+            let sep1 = PredefinedMenuItem::separator(app)?;
+            let quit_i = MenuItem::with_id(app, "quit", "退出 MemoryHub", true, None::<&str>)?;
+            let menu = Menu::with_items(app, &[&toggle_i, &rescan_i, &sep1, &quit_i])?;
+
+            let mut tray = TrayIconBuilder::with_id("main-tray")
+                .tooltip("MemoryHub")
+                .menu(&menu)
+                .icon_as_template(true)
+                .on_menu_event(|app, event| match event.id.as_ref() {
+                    "toggle" => toggle_main_window(app),
+                    "rescan" => {
+                        let _ = app.emit("tray-rescan", ());
+                    }
+                    "quit" => app.exit(0),
+                    _ => {}
+                })
+                .on_tray_icon_event(|tray, event| {
+                    // 单击托盘图标 (非拖拽) 切换窗口显隐
+                    if let TrayIconEvent::Click {
+                        button: MouseButton::Left,
+                        button_state: MouseButtonState::Up,
+                        ..
+                    } = event
+                    {
+                        toggle_main_window(tray.app_handle());
+                    }
+                });
+
+            // 菜单栏托盘图标:专用单色线条 icon (透明背景 + 黑色线条)。
+            // icon_as_template(true) 让 macOS 按菜单栏亮/暗自动反色。
+            // 必须用专用 icon,不能复用彩色 app icon —— 彩色图 template 化会变成黑方块。
+            let tray_icon = tauri::image::Image::from_bytes(include_bytes!(
+                "../icons/tray-icon.png"
+            ))
+            .expect("嵌入托盘图标失败");
+            tray = tray.icon(tray_icon);
+            tray.build(app)?;
+
+            // ---- 文件监听 (记忆变化自动刷新) ----
+            if let Some(watcher) = start_memory_watcher(app.handle().clone()) {
+                app.manage(watcher);
+            }
+
+            Ok(())
+        })
+        .build(tauri::generate_context!())
+        .expect("error while building tauri application")
+        .run(|app_handle, event| match event {
+            // 拦截窗口关闭按钮:驻留模式下隐藏窗口而非退出
+            tauri::RunEvent::WindowEvent {
+                label,
+                event: WindowEvent::CloseRequested { api, .. },
+                ..
+            } if label == "main" => {
+                if read_stay_in_tray() {
+                    api.prevent_close();
+                    if let Some(window) = app_handle.get_webview_window("main") {
+                        let _ = window.hide();
+                    }
+                }
+            }
+            // Dock 图标点击 / 应用已运行时再次唤起:重新显示窗口
+            tauri::RunEvent::Reopen { .. } => {
+                if let Some(window) = app_handle.get_webview_window("main") {
+                    let _ = window.show();
+                    let _ = window.set_focus();
+                }
+            }
+            _ => {}
+        });
 }
